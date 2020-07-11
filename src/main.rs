@@ -3,13 +3,18 @@
 #[macro_use]
 extern crate rocket;
 extern crate rocket_contrib;
+extern crate serde;
+
+#[macro_use]
+extern crate serde_derive;
 
 use rocket::http::{Cookie, Cookies, RawStr};
 use rocket::request::Form;
 use rocket::response::{Flash, Redirect};
+use rocket_contrib::json::Json;
 use rocket_contrib::serve::StaticFiles;
 
-#[derive(FromForm)]
+#[derive(Deserialize, Debug, FromForm)]
 struct User {
     name: String,
     account: usize,
@@ -34,7 +39,7 @@ fn hello_wave(name: Option<String>) -> String {
         .unwrap_or_else(|| "Hello!".into())
 }
 
-#[get("/user/<id>")]
+#[get("/user/<id>", format = "json")]
 fn user(mut cookies: Cookies, id: usize) -> String {
     cookies.add_private(Cookie::new("user_id", id.to_string()));
     format!("Hello (1) user {}!", id)
@@ -65,6 +70,11 @@ fn item(id: usize, user: Option<Form<User>>) -> String {
         .unwrap_or_else(|| format!("item {}", id))
 }
 
+#[post("/user", format = "json", data = "<user>")]
+fn new_user(user: Json<User>) -> String {
+    format!("new user {} aka {}!", user.name, user.account)
+}
+
 /// Remove the `user_id` cookie.
 #[post("/logout")]
 fn logout(mut cookies: Cookies) -> Flash<Redirect> {
@@ -76,7 +86,9 @@ fn rocket() -> rocket::Rocket {
     rocket::ignite()
         .mount(
             "/",
-            routes![index, hello, hello_wave, user, user_int, user_str, user_id, item, logout],
+            routes![
+                index, hello, hello_wave, user, user_int, user_str, user_id, new_user, item, logout
+            ],
         )
         .mount("/public", StaticFiles::from("static"))
 }
