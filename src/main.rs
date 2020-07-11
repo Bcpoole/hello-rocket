@@ -11,7 +11,7 @@ extern crate serde_derive;
 use rocket::http::{Cookie, Cookies, RawStr};
 use rocket::request::{Form, FromFormValue, LenientForm};
 use rocket::response::{Flash, Redirect};
-use rocket::Data;
+use rocket::{Data, Request};
 use rocket_contrib::json::Json;
 use rocket_contrib::serve::StaticFiles;
 use std::fs::File;
@@ -165,6 +165,16 @@ fn rocket() -> rocket::Rocket {
             ],
         )
         .mount("/public", StaticFiles::from("static"))
+        .register(catchers![not_found])
+}
+
+#[catch(404)]
+fn not_found(req: &Request) -> String {
+    format!(
+        "Sorry, {} '{}' is not a valid path.",
+        req.method(),
+        req.uri()
+    )
 }
 
 fn main() {
