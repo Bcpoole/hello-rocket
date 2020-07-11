@@ -9,7 +9,7 @@ extern crate serde;
 extern crate serde_derive;
 
 use rocket::http::{Cookie, Cookies, RawStr};
-use rocket::request::Form;
+use rocket::request::{Form, LenientForm};
 use rocket::response::{Flash, Redirect};
 use rocket_contrib::json::Json;
 use rocket_contrib::serve::StaticFiles;
@@ -75,6 +75,23 @@ fn new_user(user: Json<User>) -> String {
     format!("new user {} aka {}!", user.name, user.account)
 }
 
+#[derive(FromForm)]
+struct Task {
+    description: String,
+    #[form(field = "type")]
+    api_type: String,
+}
+
+#[post("/todo", data = "<task>")]
+fn new_task(task: Form<Task>) -> String {
+    format!("{} |{}", task.api_type, task.description)
+}
+
+#[post("/todol", data = "<task>")]
+fn new_task_lenient(task: LenientForm<Task>) -> String {
+    format!("Trimmed to: {}", task.description)
+}
+
 /// Remove the `user_id` cookie.
 #[post("/logout")]
 fn logout(mut cookies: Cookies) -> Flash<Redirect> {
@@ -87,7 +104,18 @@ fn rocket() -> rocket::Rocket {
         .mount(
             "/",
             routes![
-                index, hello, hello_wave, user, user_int, user_str, user_id, new_user, item, logout
+                index,
+                hello,
+                hello_wave,
+                user,
+                user_int,
+                user_str,
+                user_id,
+                new_user,
+                item,
+                new_task,
+                new_task_lenient,
+                logout
             ],
         )
         .mount("/public", StaticFiles::from("static"))
