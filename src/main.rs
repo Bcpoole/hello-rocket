@@ -11,8 +11,13 @@ extern crate serde_derive;
 use rocket::http::{Cookie, Cookies, RawStr};
 use rocket::request::{Form, FromFormValue, LenientForm};
 use rocket::response::{Flash, Redirect};
+use rocket::Data;
 use rocket_contrib::json::Json;
 use rocket_contrib::serve::StaticFiles;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::Read;
+use std::str;
 
 #[derive(Deserialize, Debug, FromForm)]
 struct User {
@@ -110,6 +115,27 @@ struct Person {
     age: AdultAge,
 }
 
+const LIMIT: u64 = 256;
+
+#[post("/upload", format = "plain", data = "<data>")]
+fn upload(data: Data) -> Result<String, std::io::Error> {
+    data.stream_to_file("tmp/upload.txt").map(|n| n.to_string())
+}
+
+// Upload but limit size
+#[post("/upload_limit", format = "plain", data = "<data>")]
+fn upload_limit(data: Data) -> Result<String, std::io::Error> {
+    let mut buffer = [0; LIMIT as usize];
+    data.open().take(LIMIT).read(&mut buffer).unwrap();
+    let msg = str::from_utf8(&buffer)
+        .unwrap()
+        .trim_matches(char::from(0))
+        .to_string();
+    let mut file = File::create("tmp/upload.txt")?;
+    file.write_all(msg.as_bytes())?;
+    Ok(msg)
+}
+
 /// Remove the `user_id` cookie.
 #[post("/logout")]
 fn logout(mut cookies: Cookies) -> Flash<Redirect> {
@@ -133,6 +159,8 @@ fn rocket() -> rocket::Rocket {
                 item,
                 new_task,
                 new_task_lenient,
+                upload,
+                upload_limit,
                 logout
             ],
         )
