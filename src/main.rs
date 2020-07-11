@@ -4,10 +4,10 @@
 extern crate rocket;
 extern crate rocket_contrib;
 
-use rocket::http::RawStr;
-use rocket_contrib::serve::StaticFiles;
-
+use rocket::http::{Cookie, Cookies, RawStr};
 use rocket::request::Form;
+use rocket::response::{Flash, Redirect};
+use rocket_contrib::serve::StaticFiles;
 
 #[derive(FromForm)]
 struct User {
@@ -16,8 +16,11 @@ struct User {
 }
 
 #[get("/")]
-fn index() -> &'static str {
-    "Hello, world!"
+fn index(cookies: Cookies) -> String {
+    cookies
+        .get("message")
+        .map(|value| format!("Message: {}", value))
+        .unwrap_or_else(|| "Hello, world!".to_string())
 }
 
 #[get("/hello/<name>")]
@@ -32,7 +35,8 @@ fn hello_wave(name: Option<String>) -> String {
 }
 
 #[get("/user/<id>")]
-fn user(id: usize) -> String {
+fn user(mut cookies: Cookies, id: usize) -> String {
+    cookies.add_private(Cookie::new("user_id", id.to_string()));
     format!("Hello (1) user {}!", id)
 }
 
@@ -46,6 +50,14 @@ fn user_str(id: &RawStr) -> String {
     format!("Hello (3) user {}!", id.as_str())
 }
 
+/// Retrieve the user's ID, if any.
+#[get("/user_id")]
+fn user_id(mut cookies: Cookies) -> Option<String> {
+    cookies
+        .get_private("user_id")
+        .map(|cookie| format!("User ID: {}", cookie.value()))
+}
+
 //example http://localhost:8000/item?id=123&name=Bob&account=307
 #[get("/item?<id>&<user..>")]
 fn item(id: usize, user: Option<Form<User>>) -> String {
@@ -53,12 +65,22 @@ fn item(id: usize, user: Option<Form<User>>) -> String {
         .unwrap_or_else(|| format!("item {}", id))
 }
 
-fn main() {
+/// Remove the `user_id` cookie.
+#[post("/logout")]
+fn logout(mut cookies: Cookies) -> Flash<Redirect> {
+    cookies.remove_private(Cookie::named("user_id"));
+    Flash::success(Redirect::to("/"), "Successfully logged out.")
+}
+
+fn rocket() -> rocket::Rocket {
     rocket::ignite()
         .mount(
             "/",
-            routes![index, hello, hello_wave, user, user_int, user_str, item],
+            routes![index, hello, hello_wave, user, user_int, user_str, user_id, item, logout],
         )
         .mount("/public", StaticFiles::from("static"))
-        .launch();
+}
+
+fn main() {
+    rocket().launch();
 }
