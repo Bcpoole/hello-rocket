@@ -9,7 +9,7 @@ extern crate serde;
 extern crate serde_derive;
 
 use rocket::http::{Cookie, Cookies, RawStr};
-use rocket::request::{Form, LenientForm};
+use rocket::request::{Form, FromFormValue, LenientForm};
 use rocket::response::{Flash, Redirect};
 use rocket_contrib::json::Json;
 use rocket_contrib::serve::StaticFiles;
@@ -90,6 +90,24 @@ fn new_task(task: Form<Task>) -> String {
 #[post("/todol", data = "<task>")]
 fn new_task_lenient(task: LenientForm<Task>) -> String {
     format!("Trimmed to: {}", task.description)
+}
+
+struct AdultAge(usize);
+
+impl<'v> FromFormValue<'v> for AdultAge {
+    type Error = &'v RawStr;
+
+    fn from_form_value(form_value: &'v RawStr) -> Result<AdultAge, &'v RawStr> {
+        match form_value.parse::<usize>() {
+            Ok(age) if age >= 21 => Ok(AdultAge(age)),
+            _ => Err(form_value),
+        }
+    }
+}
+
+#[derive(FromForm)]
+struct Person {
+    age: AdultAge,
 }
 
 /// Remove the `user_id` cookie.
